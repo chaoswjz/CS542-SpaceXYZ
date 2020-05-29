@@ -51,7 +51,7 @@ def data_process(response, im):
 
         elif re.match(r'.*s.jour.*', text.description.lower()) is not None:
 
-            a = np.array([np.zeros([1, 2], dtype=np.int32)], dtype=np.int32)
+            a = np.zeros([1, 2], dtype=np.int32)
 
             for vertex in text.bounding_poly.vertices:
                 b = np.array([np.array([vertex.x, vertex.y], dtype=np.int32).reshape((1, 2))], dtype=np.int32)
