@@ -111,6 +111,7 @@ taccuracy = []
 vaccuracy = []
 bestloss = sys.maxsize
 
+# training through epochs
 for epoch in range(args.epochs):
     train_loss.reset_states()
     train_accuracy.reset_states()
