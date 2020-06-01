@@ -13,13 +13,13 @@ The project is aimming to automatically calculate the area of each room in a flo
 
 (1). image preprocessing with image morphological operations with opencv
 
-(2). try to apply FCN to do the room segmentation with pytorch
+(2). applying FCN and Unet to do the room segmentation 
 
 (3). closing the gaps(doors, windows) after preprocessing
 
-(4). connected component with opencv
+(4). applying connected component algorithm with opencv to seperate each room and count labels
 
-(5). OCR using google api in the original image to identify each room
+(5). OCR using EAST with opencv in the original image to identify room type/name
 
 (6). use SSD to detect the scale bar
 
