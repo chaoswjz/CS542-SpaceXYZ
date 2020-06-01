@@ -19,7 +19,7 @@ The project is aimming to automatically calculate the area of each room in a flo
 
 (4). applying connected component algorithm with opencv to seperate each room and count labels
 
-(5). OCR using EAST with opencv in the original image to identify room type/name
+(5). OCR using EAST with openCV and pytesseract in the original image to identify room type/name
 
 (6). use SSD to detect the scale bar
 
