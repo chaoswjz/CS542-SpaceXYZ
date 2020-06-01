@@ -21,7 +21,7 @@ The project is aimming to automatically calculate the area of each room in a flo
 
 (5). OCR using EAST with openCV and pytesseract in the original image to identify room type/name (Wenjun Zhu)
 
-(6). use SSD to detect the scale bar (Jingxuan Wu, Sichen Cao)
+(6). use SSD to detect the scale bar (Jingxuan Wu, Shichen Cao)
 
 (7). use scale bar number / pixel in the detection zone to compute the area 
 
