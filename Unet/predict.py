@@ -29,7 +29,6 @@ except Exception as e:
     print("cannot load model, please check if models folder exists, if not, please run train.py first")
     exit()
 
-# expected 6 color used as we only have 6 classes
 color = {
     0: [0, 0, 255],           # color red for class 0
     1: [255, 0, 0],           # color blue for class 1
