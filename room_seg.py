@@ -100,7 +100,7 @@ def getRoomCentroid(boundary, probs, rH, rW, imgpath):
                 centroid = [(startY + endY) // 2, (startX + endX) // 2]
                 room_centroid[i].append(centroid)
 
-        return room_centroid[0], room_centroid[1], room_centroid[2], room_centroid[3]
+    return room_centroid[0], room_centroid[1], room_centroid[2], room_centroid[3]
 
 
 '''
