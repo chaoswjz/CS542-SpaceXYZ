@@ -32,8 +32,9 @@ def textDetection(imgfile, model, targetH, targetW):
     "feature_fusion/Conv_7/Sigmoid",
     "feature_fusion/concat_3"]
     east = cv2.dnn.readNet(model)
-    # RGB mean to reduce the influence of illumination, mean is the same as GoogLeNet
-    blob = cv2.dnn.blobFromImage(img, 1.0, (targetW, targetH), (124, 117, 104), swapRB=True, crop=False)
+    # read in as color img since the network require 3 channels but it's binary in the color so mean will 
+    # work in (0, 0, 0)
+    blob = cv2.dnn.blobFromImage(img, 1.0, (targetW, targetH), (0, 0, 0), swapRB=True, crop=False)
     east.setInput(blob)
     scores, geometry = east.forward(layer_names)
 
