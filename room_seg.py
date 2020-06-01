@@ -83,7 +83,7 @@ def getRoomCentroid(boundary, probs, rH, rW, imgpath):
     boxes = non_max_suppression(np.array(boundary), probs = probs)
 
     origin_img = cv2.imread(imgpath, cv2.IMREAD_COLOR)
-    H, W = origin_img.shape[:2]
+    #H, W = origin_img.shape[:2]
 
     for startX, startY, endX, endY in boxes:
         startX = int(startX * rW)
