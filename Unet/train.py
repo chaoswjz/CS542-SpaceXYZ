@@ -55,7 +55,7 @@ args = parser.parse_args()
 
 train_data = myDataGenerator(args.timgs, args.tmasks, batch=args.batch, imgsize=args.size)
 numcls = train_data.getClsnum()
-valid_data = myDatagenerator(args.vimgs, args.vmasks, numcls, batch=args.batch, imgsize=args.size)
+valid_data = myDataGenerator(args.vimgs, args.vmasks, numcls, batch=args.batch, imgsize=args.size)
 
 model = myUnet(numcls, args.filters, args.droprate, args.convkernel, args.transkernel, args.convstride,
                args.transstride, args.convpadding, args.transpadding, args.activation, args.batchnorm)
