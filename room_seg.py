@@ -1,4 +1,5 @@
-from google.cloud import vision
+from imutils.object_detection import non_max_suppression
+import pytesseract
 import cv2
 import numpy as np
 import os
@@ -10,101 +11,116 @@ building = ['oxygen', 'eko', 'equation']
 gapclose = ['./Oxygen_gapclose/', './Eko_gapclose/', './Equation_gapclose/']
 csvfiles = ['bondingboxes_oxygen.csv', 'bondingboxes_eko.csv', 'bondingboxes_equation.csv']
 
-def text_detection(img_path):
-    #credit: https://cloud.google.com/vision/docs/detecting-text#vision-text-detection-python
-    client = vision.ImageAnnotatorClient()
 
-    with io.open(img_path, 'rb') as img_f:
-        content = img_f.read()
+# ref: https://www.pyimagesearch.com/2018/08/20/opencv-text-detection-east-text-detector/
+# use east model to do predictions
+# param:
+#    imgfile: input image path
+#    model: east model path
+#    targetH, targetW: resize width and height
+# return:
+#    boundary: the coordinates of upper left and bottom right points
+#    probs: probability of each offset point being a text or the score of box arround that pixel
+#    rH, rW: ratio of original height and width over target height and width
+def textDetection(imgfile, model, targetH, targetW):
+    img = cv2.imread(imgfile, cv2.IMREAD_COLOR)
+    H, W = img.shape[:-1]
+    rH, rW = float(H) / targetH, float(W) / targetW
+    img = cv2.resize(img, (targetW, targetH))
 
-    img = vision.types.Image(content=content)
-    img_context = vision.types.ImageContext(language_hints=['en'])
-    response = client.text_detection(image=img, image_context=img_context)
+    layer_names = [
+    "feature_fusion/Conv_7/Sigmoid",
+    "feature_fusion/concat_3"]
+    east = cv2.dnn.readNet(model)
+    # RGB mean to reduce the influence of illumination, mean is the same as GoogLeNet
+    blob = cv2.dnn.blobFromImage(img, 1.0, (targetW, targetH), (124, 117, 104), swapRB=True, crop=False)
+    east.setInput(blob)
+    scores, geometry = east.forward(layer_names)
 
-    return response
+    rows, cols = scores.shape[2:4]
+    boundary = []
+    probs = []
 
+    for r in range(rows):
+        for c in range(cols):
+            up, right, down, left, angle = geometry[0, :, r, c]
+            prob = scores[0][0][r][c]
+            offsetX, offsetY = c * 4, r * 4
+            cos = np.cos(angle)
+            sin = np.sin(angle)
 
-def data_process(response, im):
-    chambre = []
-    wc = []
-    cuisine = []
-    sdb = []
+            h = up + down
+            w = left + right
 
-    contours = []
+            endX = int(offsetX + cos * right + sin * down)
+            endY = int(offsetY + cos * down - sin * right)
+            startX = max(endX - w, 0)
+            startY = max(endY - h, 0)
 
-    for text in response.text_annotations:
-        if re.match(r'.*chambre.*', text.description.lower()) is not None:
+            boundary.append((startX, startY, endX, endY))
+            probs.append(prob)
 
-            a = np.array([np.zeros([1, 2], dtype=np.int32)], dtype=np.int32)
-
-            for vertex in text.bounding_poly.vertices:
-                b = np.array([np.array([vertex.x, vertex.y], dtype=np.int32).reshape((1, 2))], dtype=np.int32)
-                a = np.concatenate((a, b), axis=0)
-            contour = a[1:, :]
-            M = cv2.moments(contour)
-            cx = int(M['m10'] / M['m00'])
-            cy = int(M['m01'] / M['m00'])
-            chambre.append([cx, cy])
-
-            #contours.append(contour)
-            #cv2.circle(im, (cx, cy), 10, (255, 0, 255), -1)
-
-        elif re.match(r'.*s.jour.*', text.description.lower()) is not None:
-
-            a = np.zeros([1, 2], dtype=np.int32)
-
-            for vertex in text.bounding_poly.vertices:
-                b = np.array([np.array([vertex.x, vertex.y], dtype=np.int32).reshape((1, 2))], dtype=np.int32)
-                a = np.concatenate((a, b), axis=0)
-            contour = a[1:, :]
-            M = cv2.moments(contour)
-            cx = int(M['m10'] / M['m00'])
-            cy = int(M['m01'] / M['m00'])
-            cuisine.append([cx, cy])
-
-            #contours.append(contour)
-            #cv2.circle(im, (cx, cy), 10, (0, 0, 255), -1)
-
-        elif re.match(r'.*wc.*', text.description.lower()) is not None:
-
-            a = np.array([np.zeros([1, 2], dtype=np.int32)], dtype=np.int32)
-
-            for vertex in text.bounding_poly.vertices:
-                b = np.array([np.array([vertex.x, vertex.y], dtype=np.int32).reshape((1, 2))], dtype=np.int32)
-                a = np.concatenate((a, b), axis=0)
-            contour = a[1:, :]
-            M = cv2.moments(contour)
-            cx = int(M['m10'] / M['m00'])
-            cy = int(M['m01'] / M['m00'])
-            wc.append([cx, cy])
-
-            #contours.append(contour)
-            #cv2.circle(im, (cx, cy), 10, (0, 255, 0), -1)
-
-        elif re.match(r'.*(sdb|basin).*', text.description.lower()) is not None:
-
-            a = np.array([np.zeros([1, 2], dtype=np.int32)], dtype=np.int32)
-
-            for vertex in text.bounding_poly.vertices:
-                b = np.array([np.array([vertex.x, vertex.y], dtype=np.int32).reshape((1, 2))], dtype=np.int32)
-                a = np.concatenate((a, b), axis=0)
-            contour = a[1:, :]
-            M = cv2.moments(contour)
-            cx = int(M['m10'] / M['m00'])
-            cy = int(M['m01'] / M['m00'])
-            sdb.append([cx, cy])
-
-            #contours.append(contour)
-            #cv2.circle(im, (cx, cy), 10, (255, 0, 0), -1)
-
-    #cv2.drawContours(im, contours, -1, (0, 255, 0), 3)
-    #cv2.namedWindow('img_con', cv2.WINDOW_NORMAL)
-    #cv2.imshow('img_con', im)
-    #cv2.waitKey(30000)
-
-    return chambre, cuisine, wc, sdb
+    return boundary, probs, (rH, rW)
 
 
+'''
+getRoomcentroid use the result from text detection to do ocr with tesseract to get the
+centroids of each type of room
+param:
+    boundary: diagonal points of a bounding box
+    probs: probability of each box
+    rH, rW: height and width ratio
+    imgpath: original image path
+return:
+    the centroids of chambre, cuisine, wc, sdb
+'''
+def getRoomCentroid(boundary, probs, rH, rW, imgpath):
+    # same order as pattern
+    room_centroid = [[], [], [], []]
+
+    pattern = [r'.*chambre.*', r'.*cuisine.*', r'.*wc.*', r'.*sdb.*']
+
+    boxes = non_max_suppression(np.array(boundary), probs = probs)
+
+    origin_img = cv2.imread(imgpath, cv2.IMREAD_COLOR)
+    H, W = origin_img.shape[:2]
+
+    for startX, startY, endX, endY in boxes:
+        startX = int(startX * rW)
+        startY = int(startY * rH)
+        endX = int(endX * rW)
+        endY = int(endY * rH)
+
+        img = origin_img[startY: endY+1, startX: endX+1, :]
+
+        text = pytesseract.image_to_string(img).lower()
+
+        for i, p in enumerate(pattern):
+            if re.match(p, text):
+                centroid = [(startY + endY) // 2, (startX + endX) // 2]
+                room_centroid[i].append(centroid)
+
+        return room_centroid[0], room_centroid[1], room_centroid[2], room_centroid[3]
+
+
+'''
+This function do room detection using connected component algorithm based on the ocr result
+param:
+    chambre: centroids for chambre
+    cuisine: centroids for cuisine
+    wc: centroids for wc
+    sdb: centroids for sdb
+    img: the preprocessed image
+    scale: area per pixel estimated
+return:
+    ret_img: return color image with colored room and area showed in the room
+    area_chambre: area of each chambre(bedroom)
+    area_cuisine: area of each cuisine(living room and kitchen)
+    area_wc: area of wc(toilet)
+    area_sdb: area of sdb(bathroom)
+    wcsdb: area of bathroom and toilet
+    room area orders are the same as the centroids orders
+'''
 def room_detection(chambre, cuisine, wc, sdb, img, scale):
     connectivity = 4
 
@@ -188,9 +204,21 @@ def room_detection(chambre, cuisine, wc, sdb, img, scale):
             cv2.putText(ret_img, str(int(scale*area_sdb[i])) + 'm^2', (sdb[i][0] - 100, sdb[i][1]), cv2.FONT_HERSHEY_SIMPLEX, 2,
                         color=(0, 0, 0), thickness=5)
 
+    area_chambre = list(np.array(area_chambre) * scale)
+    area_cuisine = list(np.array(area_cuisine) * scale)
+    area_wc = list(np.array(area_wc) * scale)
+    area_sdb = list(np.array(area_sdb) * scale)
+    wcsdb = list(np.array(wcsdb) * scale)
+
     return ret_img, area_chambre, area_cuisine, area_wc, area_sdb, wcsdb
 
 
+'''
+This function is used to remove small components created by preprocessing
+param:
+    img: an binary image being processed, should be inversed(background = white, object = black)
+    num_pixel: threshold pixel, components have pixels less than this threshold will be dropped as background
+'''
 def clean_img(img, num_pixel):
     connectivity = 4
 
@@ -211,7 +239,14 @@ def clean_img(img, num_pixel):
     return ret_img
 
 
-def get_wall_img(path, w_path):
+'''
+This function is used to do preprocessing, removing auxiliary lines, numbers and shadow of each images
+Keep using image erosion and dilation to remove noises
+param:
+    path: input images folder path
+    w_path: write path. Folder of the output images
+'''
+def get_wall_img(path: str, w_path: str) -> None:
 
     imgs = os.listdir(path)
 
@@ -241,37 +276,8 @@ def get_wall_img(path, w_path):
     print('finished')
 
 
-def remove_color(img_c):
-    for i in range(img_c.shape[0]):
-        for j in range(img_c.shape[1]):
-            if not (img_c[i][j][0] > 240 and img_c[i][j][1] > 240 and img_c[i][j][2] > 240):
-                sum = 0
-                sum1 = 0
-                for k in range(i - 10, i + 11):
-                    if img_c[k][j][0] < 180 and img_c[k][j][1] < 180 and img_c[k][j][2] < 180:
-                        sum += 1
-                for l in range(j - 10, j + 11):
-                    if img_c[i][l][0] < 180 and img_c[i][l][1] < 180 and img_c[i][l][2] < 180:
-                        sum += 1
-                if (img_c[i][j][0] < 180 and img_c[i][j][1] < 180 and img_c[i][j][2] < 180):
-                    img_c[i, j, :] = [0, 0, 0]
-                elif sum > 7:
-                    img_c[i, j, :] = [0, 0, 0]
-                elif sum1 > 7:
-                    img_c[i, j, :] = [0, 0, 0]
-                else:
-                    img_c[i, j, :] = [255, 255, 255]
-
-    img_g = cv2.cvtColor(img_c, cv2.COLOR_BGR2GRAY)
-
-    _, img_b = cv2.threshold(img_g, 250, 255, cv2.THRESH_BINARY)
-
-    return img_b
-
-
 def main():
-    i = 0
-    for build in building:
+    for i, build in enumerate(building):
         if not os.path.exists('./CV_{}/'.format(build.upper())):
             os.makedirs('./CV_{}'.format(build.upper()))
             path = './{}/'.format(build)
@@ -283,14 +289,14 @@ def main():
                 for file in os.listdir(gapclose[i]):
                     img = cv2.imread(gapclose[i] + file, cv2.IMREAD_GRAYSCALE)
                     _, img_b = cv2.threshold(img, 250, 255, cv2.THRESH_BINARY_INV)
-                    r_json = text_detection('./' + build + '/' + file)
-                    img_c = cv2.cvtColor(img_b, cv2.COLOR_GRAY2BGR)
-                    chambre, cuisine, wc, sdb = data_process(r_json, img_c)
+                    boundary, probs, ratio = textDetection('./' + build + '/' + file,
+                                                           './frozen_east_text_detection.pb', 320, 320)
+                    chambre, cuisine, wc, sdb = getRoomCentroid(boundary, probs, ratio[0], ratio[1],
+                                                                './' + build + '/' + file)
                     scale = df[df['filename'].isin([file])]['m2perpixel']
                     img_seg, a_chambre, a_cuisine, a_wc, a_sdb, wcsdb = room_detection(chambre, cuisine, wc, sdb,
                                                                                        img_b, scale)
                     cv2.imwrite(w_path + file, img_seg)
-        i += 1
 
 
 if __name__ == "__main__":
