@@ -13,13 +13,13 @@ The project is aimming to automatically calculate the area of each room in a flo
 
 (1). OCR using EAST with openCV and pytesseract in the original image to identify room type/name (Wenjun Zhu)
 
-(2). applying FCN(pytorch) and Unet(tf keras) to do the room segmentation (Rui Hong, Wenjun Zhu)
+(2). apply FCN(pytorch) and Unet(tf keras) to do the room segmentation (Rui Hong, Wenjun Zhu)
 
-(3). image preprocessing with image morphological operations with openCV (Wenjun Zhu)
+(3). image preprocess with image morphological operations with openCV (Wenjun Zhu)
 
 (4). close the gaps(doors, windows) after preprocessing (Rui Hong)
 
-(5). applying connected component algorithm with opencv to seperate each room and count labels 
+(5). apply connected component algorithm with opencv to seperate each room and count labels 
 
 (6). use SSD(tf) to detect the scale bar (Jingxuan Wu, Shichen Cao)
 
