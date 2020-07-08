@@ -11,6 +11,7 @@ building = ['oxygen', 'eko', 'equation']
 gapclose = ['./Oxygen_gapclose/', './Eko_gapclose/', './Equation_gapclose/']
 csvfiles = ['bondingboxes_oxygen.csv', 'bondingboxes_eko.csv', 'bondingboxes_equation.csv']
 
+imgnum = -1
 
 # ref: https://www.pyimagesearch.com/2018/08/20/opencv-text-detection-east-text-detector/
 # use east model to do predictions
@@ -32,8 +33,7 @@ def textDetection(imgfile, model, targetH, targetW):
     "feature_fusion/Conv_7/Sigmoid",
     "feature_fusion/concat_3"]
     east = cv2.dnn.readNet(model)
-    # read in as color img since the network require 3 channels but it's binary in the color so mean will 
-    # work in (0, 0, 0)
+    # RGB mean to reduce the influence of illumination, mean is the same as GoogLeNet
     blob = cv2.dnn.blobFromImage(img, 1.0, (targetW, targetH), (0, 0, 0), swapRB=True, crop=False)
     east.setInput(blob)
     scores, geometry = east.forward(layer_names)
@@ -58,11 +58,12 @@ def textDetection(imgfile, model, targetH, targetW):
             startX = max(endX - w, 0)
             startY = max(endY - h, 0)
 
+            if endX - startX > 50: continue
+            if endY - startY > 15: continue
+
             boundary.append((startX, startY, endX, endY))
             probs.append(prob)
-
     return boundary, probs, (rH, rW)
-
 
 '''
 getRoomcentroid use the result from text detection to do ocr with tesseract to get the
@@ -76,15 +77,16 @@ return:
     the centroids of chambre, cuisine, wc, sdb
 '''
 def getRoomCentroid(boundary, probs, rH, rW, imgpath):
+    global imgnum
+    imgnum += 1
     # same order as pattern
     room_centroid = [[], [], [], []]
 
     pattern = [r'.*chambre.*', r'.*cuisine.*', r'.*wc.*', r'.*sdb.*']
 
-    boxes = non_max_suppression(np.array(boundary), probs = probs)
+    boxes = non_max_suppression(np.array(boundary), probs=probs)
 
     origin_img = cv2.imread(imgpath, cv2.IMREAD_COLOR)
-    #H, W = origin_img.shape[:2]
 
     for startX, startY, endX, endY in boxes:
         startX = int(startX * rW)
@@ -96,12 +98,42 @@ def getRoomCentroid(boundary, probs, rH, rW, imgpath):
 
         text = pytesseract.image_to_string(img).lower()
 
+        alphanum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ &0123456789"
+        if any([a in text for a in alphanum]):
+            cv2.rectangle(origin_img, (startX, startY), (endX, endY), (0, 255, 0), 2)
+
         for i, p in enumerate(pattern):
             if re.match(p, text):
                 centroid = [(startY + endY) // 2, (startX + endX) // 2]
                 room_centroid[i].append(centroid)
 
+    cv2.imwrite("text_detection{}.jpg".format(imgnum), origin_img)
+
     return room_centroid[0], room_centroid[1], room_centroid[2], room_centroid[3]
+
+def seedFlooding(img, row_c, col_c, label):
+    assert img.shape[2] == 1, print("must be a binary image")
+
+    r_max, c_max = img.shape[0], img.shape[1]
+
+    if row_c < 0 or row_c >= r_max or col_c < 0 or col_c >= c_max:
+        return
+
+    if img[row_c][col_c] == 0 or img[row_c][col_c] == label:
+        return
+
+    img[row_c][col_c] = label
+
+    # left
+    seedFlooding(img, row_c-1, col_c, label)
+    # up
+    seedFlooding(img, row_c, col_c-1, label)
+    # right
+    seedFlooding(img, row_c, col_c+1, label)
+    # down
+    seedFlooding(img, row_c+1, col_c, label)
+
+    return
 
 
 '''
